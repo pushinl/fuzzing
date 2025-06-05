@@ -1,34 +1,40 @@
-#include <stdint.h>
-#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
 #include <ipp.h>
+#include <cups/cups.h>
 
-// Dummy callback function for ipp_io_cb_t type
-static ssize_t dummy_io_cb(void *data, void *buf, size_t bytes) {
-    // Simply return the number of bytes requested to simulate a read operation
-    return bytes;
+// Define a callback function that matches the ipp_io_cb_t type
+ipp_state_t my_io_callback(void *data, ipp_t *request, ipp_t *response) {
+    // A simple implementation of a callback
+    return IPP_STATE_IDLE;
 }
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    // Initialize variables for the function-under-test
-    void *user_data = (void *)data;  // Cast data to void* for user_data
-    ipp_io_cb_t io_cb = dummy_io_cb; // Use the dummy callback function
-    int flags = 0;                   // Initialize flags to zero
-    ipp_t *request = ippNew();       // Create a new ipp_t object for request
-    ipp_t *response = ippNew();      // Create a new ipp_t object for response
+    // Parameters for ippReadIO
+    void *buffer = (void *)data;
+    ipp_io_cb_t callback = my_io_callback;
+    int flags = 0;
+    ipp_t request, response;
 
-    // Ensure request and response are not NULL
-    if (request == NULL || response == NULL) {
-        if (request != NULL) ippDelete(request);
-        if (response != NULL) ippDelete(response);
-        return 0; // Exit if memory allocation failed
+    // Initialize ipp_t objects
+    ipp_t *request_ptr = &request;
+    ipp_t *response_ptr = &response;
+
+    // Parameters for cupsFileOpen and cupsFileClose
+    const char *filename = "/dev/null"; // Using a safe system file
+    const char *mode = "r"; // Open for reading
+    cups_file_t *file = cupsFileOpen(filename, mode);
+
+    if (!file) {
+        fprintf(stderr, "Failed to open file\n");
+        return 0; // Exit if file opening failed
     }
 
-    // Call the function-under-test
-    ipp_state_t result = ippReadIO(user_data, io_cb, flags, request, response);
+    // Call the function under test
+    ippReadIO(buffer, callback, flags, request_ptr, response_ptr);
 
-    // Clean up allocated resources
-    ippDelete(request);
-    ippDelete(response);
-
+    // Close the file
+    cupsFileClose(file);
+    
     return 0;
 }
