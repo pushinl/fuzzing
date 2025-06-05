@@ -34,6 +34,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     // Close the file
     cupsFileClose(file);
+    ippDelete(request);
+    ippDelete(response);
+
     
     return 0;
 }
