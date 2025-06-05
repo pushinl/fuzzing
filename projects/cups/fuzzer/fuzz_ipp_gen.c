@@ -14,15 +14,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     void *buffer = (void *)data;
     ipp_io_cb_t callback = my_io_callback;
     int flags = 0;
-    ipp_t request, response;
 
-    // Initialize ipp_t objects
-    ipp_t *request_ptr = &request;
-    ipp_t *response_ptr = &response;
+    ipp_t *request = ippNew();       // Create a new ipp_t object for request
+    ipp_t *response = ippNew();      // Create a new ipp_t object for response
 
     // Parameters for cupsFileOpen and cupsFileClose
-    const char *filename = "/dev/null"; // Using a safe system file
+    const char *filename;
     const char *mode = "r"; // Open for reading
+    sprintf(filename, "/tmp/libfuzzer.%d", getpid());
     cups_file_t *file = cupsFileOpen(filename, mode);
 
     if (!file) {
@@ -31,7 +30,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     }
 
     // Call the function under test
-    ippReadIO(buffer, callback, flags, request_ptr, response_ptr);
+    ippReadIO(buffer, callback, flags, request, response);
 
     // Close the file
     cupsFileClose(file);
