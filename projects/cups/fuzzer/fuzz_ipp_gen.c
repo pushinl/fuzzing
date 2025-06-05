@@ -3,16 +3,9 @@
 #include <ipp.h>
 #include <cups/cups.h>
 
-// Define a callback function that matches the ipp_io_cb_t type
-ipp_state_t my_io_callback(void *data, ipp_t *request, ipp_t *response) {
-    // A simple implementation of a callback
-    return IPP_STATE_IDLE;
-}
-
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     // Parameters for ippReadIO
     void *buffer = (void *)data;
-    ipp_io_cb_t callback = my_io_callback;
     int flags = 0;
 
     ipp_t *request = ippNew();       // Create a new ipp_t object for request
@@ -20,7 +13,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     // Parameters for cupsFileOpen and cupsFileClose
     char filename[256];
-    const char *mode = "r"; // Open for reading
+    const char *mode = "rw"; // Open for reading
     sprintf(filename, "/tmp/libfuzzer.%d", getpid());
     cups_file_t *file = cupsFileOpen(filename, mode);
 
@@ -30,7 +23,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     }
 
     // Call the function under test
-    ippReadIO(buffer, callback, flags, request, response);
+    ippReadIO(buffer, (ipp_iocb_t)cupsFileRead, flags, request, response);
 
     // Close the file
     cupsFileClose(file);
