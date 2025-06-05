@@ -19,7 +19,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     ipp_t *response = ippNew();      // Create a new ipp_t object for response
 
     // Parameters for cupsFileOpen and cupsFileClose
-    const char *filename;
+    char filename[256];
     const char *mode = "r"; // Open for reading
     sprintf(filename, "/tmp/libfuzzer.%d", getpid());
     cups_file_t *file = cupsFileOpen(filename, mode);
