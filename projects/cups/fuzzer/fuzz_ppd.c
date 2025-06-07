@@ -443,12 +443,21 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
   fclose(fp);
   fp = NULL;
 
-  if ((ppd = ppdOpenFile(filename)) == NULL)
+  /*
+   * Create and fill .ppd file
+   * with fuzz-generated data
+   */
+
+  ppd_status_t ppd_status;
+  int line_num;
+
+  ppdSetConformance(PPD_CONFORM_RELAXED);
+
+  ppd = ppdOpenFile(filename);
+  ppd_status = ppdLastError(&line_num);
+
+  if (ppd == NULL)
   {
-    ppd_status_t err; /* Last error in file */
-    int line;         /* Line number in file */
-    ppdLastError(&line);
-    ppdErrorString(err);
     for (int i = 0; i < elem_counter; i++)
     {
       free(cups_options[i]);
@@ -466,6 +475,24 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
   }
 
   pc = _ppdCacheCreateWithPPD(NULL, ppd);
+  if (!pc)
+  {
+    ppdClose(ppd);
+    for (int i = 0; i < elem_counter; i++)
+    {
+      free(cups_options[i]);
+      free(cups_values[i]);
+    }
+    free(cups_options);
+    free(cups_values);
+    free(ppdsize);
+    free(legacy);
+    free(pwg);
+    free(ppdmedia);
+    free(marked_option);
+    free(options_str);
+    return 1;
+  }
 
   /*
    * Do pwg tests from testpwg.c
