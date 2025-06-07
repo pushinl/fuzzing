@@ -77,6 +77,7 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
   int elem_counter = 0;
   FILE *fp = NULL;
   char *pagesize = NULL;
+  char *emitted_string = NULL;
 
   /*
    * Create and fill variables (options)
@@ -585,10 +586,17 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
   }
 
   for (int i = 0; i < 5; i++)
-    ppdEmitString(ppd, i, 0.0);
+  {
+    emitted_string = ppdEmitString(ppd, i, 0.0);
+    if (emitted_string)
+    {
+      free(emitted_string);
+      emitted_string = NULL;
+    }
+  }
 
   ppdPageSizeLimits(ppd, &minsize, &maxsize);
-  ppdPageSize(ppd, NULL);
+  size = ppdPageSize(ppd, NULL);
 
   for (int i = 0; i < elem_counter; i++)
   {
