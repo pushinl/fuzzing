@@ -17,6 +17,7 @@
 
 int fuzz_ppd(char *string, int len, char *filename, char *pwgname);
 void unlink_tempfile(void);
+int validate_ppd_file(const char *filename, const char *data, int len);
 
 extern int
 LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
@@ -420,8 +421,7 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
    * with fuzz-generated data
    */
 
-  fp = fopen(filename, "wb");
-  if (!fp)
+  if (!validate_ppd_file(filename, data, len))
   {
     for (int i = 0; i < elem_counter; i++)
     {
@@ -438,15 +438,6 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
     free(options_str);
     return 1;
   }
-
-  fwrite(data, sizeof(*data), len, fp);
-  fclose(fp);
-  fp = NULL;
-
-  /*
-   * Create and fill .ppd file
-   * with fuzz-generated data
-   */
 
   ppd_status_t ppd_status;
   int line_num;
@@ -660,4 +651,23 @@ void unlink_tempfile(void)
   unlink(filename);
   sprintf(filename, "%s.N", filename);
   unlink(filename);
+}
+
+int validate_ppd_file(const char *filename, const char *data, int len)
+{
+  FILE *fp = fopen(filename, "wb");
+  if (!fp)
+    return 0;
+
+  fwrite(data, sizeof(*data), len, fp);
+  fclose(fp);
+
+  ppd_file_t *test_ppd = ppdOpenFile(filename);
+  if (test_ppd)
+  {
+    ppdClose(test_ppd);
+    return 1;
+  }
+
+  return 0;
 }
