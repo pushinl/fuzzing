@@ -466,6 +466,24 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
   }
 
   pc = _ppdCacheCreateWithPPD(NULL, ppd);
+  if (!pc)
+  {
+    ppdClose(ppd);
+    for (int i = 0; i < elem_counter; i++)
+    {
+      free(cups_options[i]);
+      free(cups_values[i]);
+    }
+    free(cups_options);
+    free(cups_values);
+    free(ppdsize);
+    free(legacy);
+    free(pwg);
+    free(ppdmedia);
+    free(marked_option);
+    free(options_str);
+    return 1;
+  }
 
   /*
    * Do pwg tests from testpwg.c
