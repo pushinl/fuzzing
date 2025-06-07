@@ -76,6 +76,7 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
   char *choice = NULL;
   int elem_counter = 0;
   FILE *fp = NULL;
+  char *pagesize = NULL;
 
   /*
    * Create and fill variables (options)
@@ -469,7 +470,6 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
    * Do pwg tests from testpwg.c
    */
 
-  char *pagesize;
   _ppdCacheWriteFile(pc, pwgname, NULL);
   pc2 = _ppdCacheCreateWithFile(pwgname, NULL);
   _ppdCacheDestroy(pc2);
@@ -555,8 +555,27 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
     {
       ppdMarkOption(ppd, cups_options[i], cups_values[i]);
       cupsGetOption(cups_options[i], num_options, options);
+
+      cups_option_t *temp_options = options;
+      int temp_num_options = num_options;
+
       num_options = cupsGetConflicts(ppd, cups_options[i], cups_values[i], &options);
-      cupsResolveConflicts(ppd, cups_options[i], cups_values[i], &num_options, &options);
+
+      if (temp_options != options && temp_num_options > 0)
+      {
+        cupsFreeOptions(temp_num_options, temp_options);
+      }
+
+      temp_options = options;
+      temp_num_options = num_options;
+
+      int res = cupsResolveConflicts(ppd, cups_options[i], cups_values[i], &num_options, &options);
+
+      if (res && temp_options != options && temp_num_options > 0)
+      {
+        cupsFreeOptions(temp_num_options, temp_options);
+      }
+
       ppdInstallableConflict(ppd, cups_options[i], cups_values[i]);
     }
     ppdInstallableConflict(ppd, options_str, choice);
@@ -590,6 +609,10 @@ int fuzz_ppd(char *data, int len, char *filename, char *pwgname)
   free(legacy);
   free(pwg);
   free(ppdmedia);
+
+  if (pagesize)
+    free(pagesize);
+
   return 0;
 }
 
