@@ -33,8 +33,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         if (cache)
         {
             _ppdCacheGetBin(cache, "output-bin");
-            int exact;
-            _ppdCacheGetPageSize(cache, NULL, "keyword", &exact);
             // Destroy the cache
             _ppdCacheDestroy(cache);
         }
