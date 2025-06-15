@@ -6,13 +6,15 @@
 #include "cups.h"
 #include "file-private.h"
 
-int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
+{
     // Create a temporary file to simulate a PPD file
     char filename[256];
     snprintf(filename, sizeof(filename), "/tmp/fuzz_ppd_%d.ppd", getpid());
 
     FILE *file = fopen(filename, "wb");
-    if (!file) {
+    if (!file)
+    {
         return 0; // Could not create file, exit
     }
 
@@ -21,7 +23,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     // Open the PPD file
     ppd_file_t *ppd = ppdOpenFile(filename);
-    if (!ppd) {
+    if (!ppd)
+    {
         unlink(filename);
         return 0; // Could not open PPD file, exit
     }
