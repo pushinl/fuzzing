@@ -32,14 +32,22 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         _ppd_cache_t *cache = _ppdCacheCreateWithPPD(NULL, ppd);
         if (cache)
         {
+
             // Use the cache
-            _ppdCacheWriteFile(cache, filename, NULL);
+            char cache_filename[256];
+            snprintf(cache_filename, sizeof(cache_filename), "/tmp/fuzz_ppd_cache_%d.ppd", getpid());
+
+            // Write the cache to a temporary file
+            _ppdCacheWriteFile(cache, cache_filename, NULL);
             _ppdCacheGetBin(cache, "output-bin");
             int exact;
             _ppdCacheGetPageSize(cache, NULL, "keyword", &exact);
 
             // Destroy the cache
             _ppdCacheDestroy(cache);
+
+            // Clean up the temporary file
+            unlink(cache_filename);
         }
 
         // Close the PPD file
