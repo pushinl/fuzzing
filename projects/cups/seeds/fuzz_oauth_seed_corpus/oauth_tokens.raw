@@ -1,0 +1,5 @@
+{"access_token":"abc123","token_type":"Bearer","expires_in":3600}
+{"access_token":"xyz789","token_type":"Bearer","expires_in":7200,"refresh_token":"refresh123"}
+{"error":"invalid_grant","error_description":"The provided authorization grant is invalid"}
+access_token=abc123&token_type=Bearer&expires_in=3600
+https://oauth.example.com/authorize?client_id=123&response_type=code&redirect_uri=http://localhost 
