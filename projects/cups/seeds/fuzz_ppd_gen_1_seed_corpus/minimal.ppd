@@ -1,0 +1,18 @@
+*PPD-Adobe: "4.3"
+*FormatVersion: "4.3"
+*FileVersion: "1.0"
+*LanguageVersion: English
+*LanguageEncoding: ISOLatin1
+*PCFileName: "MINIMAL.PPD"
+*Manufacturer: "Test"
+*Product: "(Minimal Printer)"
+*cupsVersion: 2.0
+*cupsModelNumber: 1
+
+*OpenUI *PageSize: PickOne
+*DefaultPageSize: Letter
+*PageSize Letter: "<</PageSize[612 792]>>setpagedevice"
+*CloseUI: *PageSize
+
+*DefaultImageableArea: Letter
+*ImageableArea Letter: "0 0 612 792" 

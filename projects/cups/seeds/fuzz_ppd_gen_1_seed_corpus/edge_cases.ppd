@@ -1,0 +1,28 @@
+*PPD-Adobe: "4.3"
+*FormatVersion: "4.3"
+*FileVersion: "1.0"
+*LanguageVersion: English
+*LanguageEncoding: ISOLatin1
+*PCFileName: "EDGE.PPD"
+*Manufacturer: "Edge Test"
+*Product: "(Edge Cases Printer)"
+*cupsVersion: 2.4
+*cupsModelNumber: 999999
+
+*OpenUI *TestOption: PickOne
+*DefaultTestOption: OptionWithLongNameThatMightCauseIssues
+*TestOption OptionWithLongNameThatMightCauseIssues: "test"
+*TestOption ShortOpt: "short"
+*TestOption "": "empty"
+*CloseUI: *TestOption
+
+*OpenUI *NumericTest: PickOne
+*DefaultNumericTest: 0
+*NumericTest 0: "zero"
+*NumericTest -1: "negative"
+*NumericTest 2147483647: "maxint"
+*CloseUI: *NumericTest
+
+*% Test comments and special characters
+*SpecialChars: "Test \"quotes\" and \\backslashes\\"
+*UnicodeTest: "测试中文字符" 

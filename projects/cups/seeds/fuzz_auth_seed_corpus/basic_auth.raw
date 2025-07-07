@@ -1,0 +1,4 @@
+WWW-Authenticate: Basic realm="CUPS"
+Authorization: Basic dXNlcjpwYXNzd29yZA==
+WWW-Authenticate: Digest realm="CUPS", nonce="abc123", qop="auth"
+Authorization: Digest username="admin", realm="CUPS", nonce="abc123", uri="/admin", response="hash123" 
