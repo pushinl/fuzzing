@@ -1,0 +1,14 @@
+{
+    "printer": {
+        "name": "HP LaserJet",
+        "model": "P1006",
+        "status": {
+            "online": true,
+            "jobs": 3
+        }
+    },
+    "server": {
+        "host": "localhost",
+        "port": 631
+    }
+}
