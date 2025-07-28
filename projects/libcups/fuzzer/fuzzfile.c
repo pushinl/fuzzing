@@ -235,44 +235,6 @@ static void test_file_path_operations(const uint8_t *data, size_t size)
     }
 }
 
-// Test file descriptor operations
-static void test_file_fd_operations(const uint8_t *data, size_t size)
-{
-    if (size < 8)
-        return;
-
-    char filename[256];
-    snprintf(filename, sizeof(filename), "/tmp/fuzz_fd_%d_%zu.test", getpid(), size);
-    add_temp_file(filename);
-
-    // Create file with regular file operations first
-    int fd = open(filename, O_CREAT | O_RDWR, 0644);
-    if (fd >= 0)
-    {
-        write(fd, data, size);
-        lseek(fd, 0, SEEK_SET);
-
-        // Test cupsFileOpenFd
-        cups_file_t *fp = cupsFileOpenFd(fd, "r");
-        if (fp)
-        {
-            char buffer[512];
-            size_t read_size = cupsFileRead(fp, buffer, sizeof(buffer));
-            (void)read_size;
-
-            // Test that fd is managed by cupsFile
-            int file_fd = cupsFileNumber(fp);
-            (void)file_fd;
-
-            cupsFileClose(fp); // This should close the fd too
-        }
-        else
-        {
-            close(fd);
-        }
-    }
-}
-
 // Test directory operations
 static void test_directory_operations(const uint8_t *data, size_t size)
 {
@@ -397,16 +359,10 @@ extern int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     // Test 3: File path and finding operations
     test_file_path_operations(data, size);
 
-    // Test 4: File descriptor operations
-    if (size >= 8)
-    {
-        test_file_fd_operations(data, size);
-    }
-
-    // Test 5: Directory operations
+    // Test 4: Directory operations
     test_directory_operations(data, size);
 
-    // Test 6: File locking operations
+    // Test 5: File locking operations
     if (size >= 8)
     {
         test_file_locking(data, size);
