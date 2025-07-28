@@ -1,0 +1,8 @@
+{
+    "unicode": "测试中文",
+    "escaped": "Line1\nLine2\tTabbed",
+    "quotes": "He said \"Hello\"",
+    "path": "C:\\Program Files\\CUPS",
+    "empty_string": "",
+    "zero": 0
+}

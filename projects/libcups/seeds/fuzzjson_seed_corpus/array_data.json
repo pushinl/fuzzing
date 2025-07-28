@@ -1,0 +1,21 @@
+{
+    "printers": [
+        "HP LaserJet",
+        "Canon PIXMA",
+        "Epson EcoTank"
+    ],
+    "numbers": [
+        1,
+        2,
+        3,
+        42,
+        100
+    ],
+    "mixed": [
+        true,
+        false,
+        null,
+        "string",
+        123
+    ]
+}
