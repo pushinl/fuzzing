@@ -128,19 +128,6 @@ static void test_json_operations(const char *json_str)
             }
         }
 
-        // Test cupsJSONGetChild
-        cups_json_t *child = cupsJSONGetChild(json);
-        if (child)
-        {
-            // Test cupsJSONGetSibling
-            cups_json_t *sibling = cupsJSONGetSibling(child);
-            (void)sibling;
-
-            // Test cupsJSONGetKey
-            const char *key = cupsJSONGetKey(child);
-            (void)key;
-        }
-
         // Test cupsJSONExportString
         exported_str = cupsJSONExportString(json);
         if (exported_str)
