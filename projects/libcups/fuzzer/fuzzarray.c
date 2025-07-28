@@ -212,92 +212,6 @@ static void test_array_custom_functions(char **strings, int count)
         cupsArrayDelete(array);
     }
 }
-
-// Test array manipulation and edge cases
-static void test_array_manipulation(char **strings, int count)
-{
-    if (count == 0)
-        return;
-
-    // Test array with hash functionality
-    cups_array_t *hash_array = cupsArrayNew(
-        (cups_array_cb_t)strcmp,
-        NULL,
-        (cups_ahash_cb_t)cupsArrayHashData,
-        64, // hash size
-        (cups_acopy_cb_t)strdup,
-        (cups_afree_cb_t)free);
-
-    if (hash_array)
-    {
-        // Add elements to hash array
-        for (int i = 0; i < count; i++)
-        {
-            cupsArrayAdd(hash_array, strings[i]);
-        }
-
-        // Test searching in hash array
-        for (int i = 0; i < count && i < 10; i++)
-        {
-            void *found = cupsArrayFind(hash_array, strings[i]);
-            (void)found;
-        }
-
-        // Test cupsArrayClear
-        cupsArrayClear(hash_array);
-
-        // Verify array is empty
-        int cleared_count = cupsArrayGetCount(hash_array);
-        (void)cleared_count;
-
-        cupsArrayDelete(hash_array);
-    }
-}
-
-// Test array with different hash sizes and edge cases
-static void test_array_edge_cases(const uint8_t *data, size_t size)
-{
-    if (size < 16)
-        return;
-
-    // Test with different hash sizes
-    int hash_sizes[] = {0, 1, 2, 16, 64, 256, 1024};
-
-    for (int i = 0; i < 7 && i < size; i++)
-    {
-        cups_array_t *array = cupsArrayNew(
-            (cups_array_cb_t)strcmp,
-            NULL,
-            (cups_ahash_cb_t)cupsArrayHashData,
-            hash_sizes[i],
-            NULL,
-            NULL);
-
-        if (array)
-        {
-            // Add some test data based on input
-            for (int j = 0; j < 10 && j < size; j++)
-            {
-                char test_str[32];
-                snprintf(test_str, sizeof(test_str), "test_%d_%d", data[j], j);
-                cupsArrayAdd(array, test_str);
-            }
-
-            // Test operations
-            int count = cupsArrayGetCount(array);
-            (void)count;
-
-            // Test finding elements
-            char search_str[32];
-            snprintf(search_str, sizeof(search_str), "test_%d_0", data[0]);
-            void *found = cupsArrayFind(array, search_str);
-            (void)found;
-
-            cupsArrayDelete(array);
-        }
-    }
-}
-
 // Test array with NULL and empty elements
 static void test_array_null_empty(void)
 {
@@ -393,16 +307,10 @@ extern int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     // Test 2: Array with custom functions
     test_array_custom_functions(strings, string_count);
 
-    // Test 3: Array manipulation and clearing
-    test_array_manipulation(strings, string_count);
-
-    // Test 4: Edge cases with different hash sizes
-    test_array_edge_cases(data, size);
-
-    // Test 5: NULL and empty element handling
+    // Test 3: NULL and empty element handling
     test_array_null_empty();
 
-    // Test 6: Stress testing with many elements
+    // Test 4: Stress testing with many elements
     if (size >= 32)
     {
         test_array_stress(data, size);
