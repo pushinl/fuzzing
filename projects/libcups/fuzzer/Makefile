@@ -1,5 +1,5 @@
-TARGETS = \
-	fuzzipp \
+FUZZ_SRCS := $(wildcard fuzz*.c)
+TARGETS := $(basename $(FUZZ_SRCS))
 
 CC=clang
 CXX=clang++
