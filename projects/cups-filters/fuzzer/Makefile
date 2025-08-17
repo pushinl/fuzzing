@@ -11,11 +11,11 @@ TARGETS := $(basename $(FUZZ_SRCS))
 #     endif
 # endif
 
-INCDIR=-I./../filter -I./../fontembed -I./../
-LIBDIR=-L./../filter -L./../fontembed -L./../ -L./../.libs
+INCDIR=-I./../filter -I./../fontembed -I./../ -I./../cupsfilters
+LIBDIR=-L./../filter -L./../fontembed -L./../ -L./../.libs -L./../cupsfilters/.libs
 
 BUILD_FLAGS=-g -O0 
-LINK_FLAGS=-Wl,--allow-multiple-definition -l:libfontembed.a -l:libtiff.a -l:libjpeg.a
+LINK_FLAGS=-Wl,--allow-multiple-definition -l:libfontembed.a -l:libtiff.a -l:libjpeg.a -l:libcupsfilters.a -lcups -lppd -lz -lpng -lfontconfig -lfreetype -lm -lpthread
 # LIB_FUZZING_ENGINE = -fsanitize=fuzzer,address
 
 All: $(TARGETS)
