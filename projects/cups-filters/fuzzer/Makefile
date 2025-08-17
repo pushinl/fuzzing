@@ -15,7 +15,7 @@ INCDIR=-I./../filter -I./../fontembed -I./../ -I./../cupsfilters
 LIBDIR=-L./../filter -L./../fontembed -L./../ -L./../.libs -L./../cupsfilters/.libs
 
 BUILD_FLAGS=-g -O0 
-LINK_FLAGS=-Wl,--allow-multiple-definition -l:libfontembed.a -l:libtiff.a -l:libjpeg.a -l:libcupsfilters.a -lcups -lppd -lz -lpng -lfontconfig -lfreetype -lm -lpthread
+LINK_FLAGS=-Wl,--allow-multiple-definition -l:libfontembed.a -l:libtiff.a -l:libjpeg.a -l:libcupsfilters.a -lcups
 # LIB_FUZZING_ENGINE = -fsanitize=fuzzer,address
 
 All: $(TARGETS)
