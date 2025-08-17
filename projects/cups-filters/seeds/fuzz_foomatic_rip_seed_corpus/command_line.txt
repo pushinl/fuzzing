@@ -1,0 +1,1 @@
+foomatic-rip job user title copies "PageSize=A4 Resolution=600dpi" /path/to/file.ps

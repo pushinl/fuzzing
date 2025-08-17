@@ -1,0 +1,8 @@
+This is a text file that will be processed by the universal filter.
+It should be converted to PDF by default.
+
+Multiple lines
+  With indentation
+	And tabs
+
+Special characters: åäöñç €£¥

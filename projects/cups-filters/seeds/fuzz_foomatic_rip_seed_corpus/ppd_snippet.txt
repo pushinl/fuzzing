@@ -1,0 +1,16 @@
+*PPD-Adobe: "4.3"
+*FormatVersion: "4.3"
+*FileVersion: "1.0"
+*LanguageVersion: English
+*Product: "(Test Printer)"
+*PSVersion: "(3010.000) 0"
+*ModelName: "Test Printer"
+*ShortNickName: "Test"
+*NickName: "Test Printer"
+*ColorDevice: True
+*DefaultColorSpace: RGB
+*DefaultResolution: 600dpi
+*PageSize Letter/US Letter: ""
+*PageSize A4/A4: ""
+*PageRegion Letter/US Letter: ""
+*PageRegion A4/A4: ""

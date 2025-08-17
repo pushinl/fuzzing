@@ -24,6 +24,10 @@ fuzz_dither:
 	$(CC) $(CFLAGS) $(INCDIR) $(BUILD_FLAGS) -c -o fuzz_dither.o fuzz_dither.c
 	$(CXX) $(CFLAGS) $(LIBDIR) $(LIB_FUZZING_ENGINE) -o fuzz_dither fuzz_dither.o $(LINK_FLAGS) -Wl,-rpath,'$$ORIGIN/lib'
 
+$(TARGETS):
+	$(CC) $(CFLAGS) $(INCDIR) $(BUILD_FLAGS) -c -o $@.o $@.c
+	$(CXX) $(CFLAGS) $(LIBDIR) $(LIB_FUZZING_ENGINE) -o $@ $@.o $(LINK_FLAGS) -Wl,-rpath,'$$ORIGIN/lib'
+
 oss_fuzzers:
 	cp $(TARGETS) $(OUT)
 # for loading missing shared libs

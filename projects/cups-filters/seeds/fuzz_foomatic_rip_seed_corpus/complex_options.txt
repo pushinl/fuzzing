@@ -1,0 +1,14 @@
+PageSize=Letter
+Resolution=1200x600dpi
+ColorModel=CMYK
+Quality=High
+Duplex=DuplexNoTumble
+Copies=5
+MediaType=Plain
+PrintQuality=Draft
+Brightness=50
+Contrast=75
+Saturation=100
+Gamma=1.8
+ThinLineEnhance=True
+RET=Medium

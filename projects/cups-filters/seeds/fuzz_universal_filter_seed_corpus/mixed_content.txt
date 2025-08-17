@@ -1,0 +1,11 @@
+This file contains mixed content types for testing.
+
+%PDF-1.4 (fake PDF header)
+%!PS-Adobe (fake PostScript header)
+
+Normal text content continues here...
+Line 1
+Line 2
+Line 3
+
+Binary-like data: ÿØÿàJFIF
