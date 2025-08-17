@@ -17,7 +17,7 @@ LIBDIR=-L./../filter -L./../fontembed -L./../ -L./../.libs -L./../cupsfilters/.l
 BUILD_FLAGS=-g -O0 
 LINK_FLAGS=-Wl,--allow-multiple-definition \
     -l:libfontembed.a -l:libtiff.a -l:libjpeg.a \
-    -lpng -lexif -lcupsimage -lcups -lz -lm -lpthread
+    -lpng -lexif -lcupsfilters -lcups -lz -lm -lpthread
 # LIB_FUZZING_ENGINE = -fsanitize=fuzzer,address
 
 All: $(TARGETS)
