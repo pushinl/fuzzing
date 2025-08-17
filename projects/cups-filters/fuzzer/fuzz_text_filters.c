@@ -1,4 +1,6 @@
-#include "pdfutils.h"
+#include <cupsfilters/driver.h>
+#include <cups/cups.h>
+#include <cups/ppd.h>
 #include <assert.h>
 #include <string.h>
 #include <stdint.h>
@@ -7,9 +9,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <errno.h>
 
-static void redirect_stdout_stderr();
+static void redirect_stdout_stderr(); // hide stdout
 
+// Test dithering and LUT functions (closest to text processing in current branch)
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 {
     if (Size < 5 || Size > 100000)
@@ -19,101 +23,139 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 
     redirect_stdout_stderr();
 
-    // Create temporary input file
-    char input_file[] = "/tmp/fuzz_text_input_XXXXXX";
-    int input_fd = mkstemp(input_file);
-    if (input_fd < 0)
+    // Extract parameters from fuzzer data
+    int num_values = (Data[0] % 16) + 2; // 2-17 values
+    int width = (Data[1] % 512) + 1;     // 1-512 width
+
+    // Ensure we have enough data
+    if (Size < (size_t)(num_values * 4 + 10))
     {
         return 0;
     }
 
-    // Write fuzzer input to temporary file
-    if (write(input_fd, Data, Size) != (ssize_t)Size)
+    // Create LUT values from fuzzer data
+    float *values = (float *)malloc(num_values * sizeof(float));
+    if (!values)
     {
-        close(input_fd);
-        unlink(input_file);
-        return 0;
-    }
-    close(input_fd);
-
-    // Create temporary output file
-    char output_file[] = "/tmp/fuzz_text_output_XXXXXX";
-    int output_fd = mkstemp(output_file);
-    if (output_fd < 0)
-    {
-        unlink(input_file);
         return 0;
     }
 
-    // Test 1: Text to PDF conversion using pdfOut
-    pdfOut *pdf = pdfOut_new();
-    if (pdf)
+    // Initialize values from fuzzer data
+    for (int i = 0; i < num_values; i++)
     {
-        pdfOut_begin_pdf(pdf);
+        int offset = 2 + i * 4;
+        // Convert bytes to float value between 0.0 and 1.0
+        unsigned int val = (Data[offset] << 24) | (Data[offset + 1] << 16) |
+                           (Data[offset + 2] << 8) | Data[offset + 3];
+        values[i] = (float)(val % 1000) / 1000.0f;
+    }
 
-        // Add font
-        int font_obj = pdfOut_add_xref(pdf);
-        pdfOut_printf(pdf, "%d 0 obj\n"
-                           "<</Type/Font\n"
-                           "  /Subtype /Type1\n"
-                           "  /BaseFont /Courier\n"
-                           ">>\n"
-                           "endobj\n",
-                      font_obj);
-
-        // Add content stream
-        int content_obj = pdfOut_add_xref(pdf);
-        char *text_buf = (char *)malloc(Size + 1);
-        if (text_buf)
+    // Sort values to ensure proper LUT
+    for (int i = 0; i < num_values - 1; i++)
+    {
+        for (int j = i + 1; j < num_values; j++)
         {
-            memcpy(text_buf, Data, Size);
-            text_buf[Size] = '\0';
-
-            // Sanitize text for PDF
-            for (size_t i = 0; i < Size; i++)
+            if (values[i] > values[j])
             {
-                if (text_buf[i] < 32 && text_buf[i] != '\n' && text_buf[i] != '\r' && text_buf[i] != '\t')
+                float temp = values[i];
+                values[i] = values[j];
+                values[j] = temp;
+            }
+        }
+    }
+
+    // Test cupsLutNew
+    cups_lut_t *lut = cupsLutNew(num_values, values);
+    if (lut)
+    {
+        // Test cupsDitherNew
+        cups_dither_t *dither = cupsDitherNew(width);
+        if (dither)
+        {
+            // Create test data for dithering
+            short *line = (short *)malloc(width * sizeof(short));
+            unsigned char *pixels = (unsigned char *)malloc(width);
+
+            if (line && pixels)
+            {
+                // Fill line with test data from fuzzer
+                for (int i = 0; i < width; i++)
                 {
-                    text_buf[i] = ' ';
+                    int data_idx = (10 + i) % Size;
+                    line[i] = (short)((Data[data_idx] * 16) % 4096); // Scale to 0-4095
+                }
+
+                // Test dithering
+                cupsDitherLine(dither, lut, line, 1, pixels);
+
+                // Test with multiple channels if we have enough data
+                if (width > 4)
+                {
+                    short *multi_line = (short *)malloc(width * 3 * sizeof(short));
+                    unsigned char *multi_pixels = (unsigned char *)malloc(width * 3);
+
+                    if (multi_line && multi_pixels)
+                    {
+                        // Fill with RGB data
+                        for (int i = 0; i < width * 3; i++)
+                        {
+                            int data_idx = (20 + i) % Size;
+                            multi_line[i] = (short)((Data[data_idx] * 16) % 4096);
+                        }
+
+                        cupsDitherLine(dither, lut, multi_line, 3, multi_pixels);
+                    }
+
+                    free(multi_line);
+                    free(multi_pixels);
                 }
             }
 
-            pdfOut_printf(pdf, "%d 0 obj\n"
-                               "<</Length %d\n"
-                               ">>\n"
-                               "stream\n"
-                               "BT\n"
-                               "/F1 12 Tf\n"
-                               "50 750 Td\n"
-                               "(%s) Tj\n"
-                               "ET\n"
-                               "endstream\n"
-                               "endobj\n",
-                          content_obj, (int)strlen(text_buf) + 50, text_buf);
-            free(text_buf);
+            free(line);
+            free(pixels);
+            cupsDitherDelete(dither);
         }
 
-        // Add page
-        int page_obj = pdfOut_add_xref(pdf);
-        pdfOut_printf(pdf, "%d 0 obj\n"
-                           "<</Type/Page\n"
-                           "  /Parent 1 0 R\n"
-                           "  /MediaBox [0 0 595 842]\n"
-                           "  /Contents %d 0 R\n"
-                           "  /Resources << /Font << /F1 %d 0 R >> >>\n"
-                           ">>\n"
-                           "endobj\n",
-                      page_obj, content_obj, font_obj);
+        cupsLutDelete(lut);
+    }
 
-        pdfOut_add_page(pdf, page_obj);
-        pdfOut_finish_pdf(pdf);
-        pdfOut_free(pdf);
+    // Test packing functions
+    if (Size > 30)
+    {
+        int pack_width = (Data[2] % 100) + 1;
+        unsigned char *pack_input = (unsigned char *)malloc(pack_width);
+        unsigned char *pack_output = (unsigned char *)malloc(pack_width);
+
+        if (pack_input && pack_output)
+        {
+            // Fill with fuzzer data
+            for (int i = 0; i < pack_width; i++)
+            {
+                pack_input[i] = Data[(30 + i) % Size];
+            }
+
+            // Test horizontal packing
+            unsigned char on_mask = Data[3] % 256;
+            int num_comps = (Data[4] % 4) + 1;
+            cupsPackHorizontal(pack_input, pack_output, pack_width, on_mask, num_comps);
+
+            // Test horizontal packing 2
+            cupsPackHorizontal2(pack_input, pack_output, pack_width, num_comps);
+
+            // Test horizontal bit packing
+            unsigned char off_mask = Data[5] % 256;
+            cupsPackHorizontalBit(pack_input, pack_output, pack_width, on_mask, off_mask);
+
+            // Test vertical packing
+            cupsPackVertical(pack_input, pack_output, pack_width, on_mask, num_comps);
+        }
+
+        free(pack_input);
+        free(pack_output);
     }
 
     // Cleanup
-    close(output_fd);
-    unlink(input_file);
-    unlink(output_file);
+    free(values);
 
     return 0;
 }
@@ -123,7 +165,6 @@ void redirect_stdout_stderr()
     int dev_null = open("/dev/null", O_WRONLY);
     if (dev_null < 0)
     {
-        perror("Failed to open /dev/null");
         return;
     }
     dup2(dev_null, STDOUT_FILENO);

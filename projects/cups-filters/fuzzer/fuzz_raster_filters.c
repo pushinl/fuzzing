@@ -1,4 +1,8 @@
-#include "pdfutils.h"
+#include <cupsfilters/driver.h>
+#include <cupsfilters/raster.h>
+#include <cups/cups.h>
+#include <cups/ppd.h>
+#include <cups/raster.h>
 #include <assert.h>
 #include <string.h>
 #include <stdint.h>
@@ -7,155 +11,179 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <errno.h>
 
-static void redirect_stdout_stderr();
+static void redirect_stdout_stderr(); // hide stdout
 
+// Test raster and color separation functions
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 {
-    if (Size < 10 || Size > 100000)
+    if (Size < 20 || Size > 100000)
     {
         return 0;
     }
 
     redirect_stdout_stderr();
 
-    // Create temporary raster input file
-    char raster_file[] = "/tmp/fuzz_raster_input_XXXXXX";
-    int raster_fd = mkstemp(raster_file);
-    if (raster_fd < 0)
+    // Extract parameters from fuzzer data
+    int num_samples = (Data[0] % 50) + 1; // 1-50 samples
+    int cube_size = (Data[1] % 16) + 2;   // 2-17 cube size
+    int num_channels = (Data[2] % 8) + 1; // 1-8 channels
+    int num_pixels = (Data[3] % 100) + 1; // 1-100 pixels
+
+    // Ensure we have enough data
+    if (Size < (size_t)(20 + num_samples * 3 + num_pixels * num_channels))
     {
         return 0;
     }
 
-    // Write raster data
-    if (write(raster_fd, Data, Size) != (ssize_t)Size)
+    // Test RGB color separation
+    cups_sample_t *samples = (cups_sample_t *)malloc(num_samples * sizeof(cups_sample_t));
+    if (!samples)
     {
-        close(raster_fd);
-        unlink(raster_file);
         return 0;
     }
-    close(raster_fd);
 
-    // Test raster to PDF conversion
-    pdfOut *pdf = pdfOut_new();
-    if (pdf)
+    // Initialize samples from fuzzer data
+    for (int i = 0; i < num_samples; i++)
     {
-        pdfOut_begin_pdf(pdf);
+        int offset = 4 + i * 3;
+        samples[i].rgb[0] = Data[offset % Size];
+        samples[i].rgb[1] = Data[(offset + 1) % Size];
+        samples[i].rgb[2] = Data[(offset + 2) % Size];
 
-        // Simulate raster header processing
-        if (Size >= 32)
+        // Fill color values
+        for (int j = 0; j < CUPS_MAX_RGB && j < num_channels; j++)
         {
-            // Extract basic raster parameters from fuzzer data
-            uint32_t width = ((uint32_t)Data[0] << 24) | ((uint32_t)Data[1] << 16) |
-                             ((uint32_t)Data[2] << 8) | Data[3];
-            uint32_t height = ((uint32_t)Data[4] << 24) | ((uint32_t)Data[5] << 16) |
-                              ((uint32_t)Data[6] << 8) | Data[7];
+            samples[i].colors[j] = Data[(offset + j + 3) % Size];
+        }
+    }
 
-            // Clamp dimensions to reasonable values
-            width = (width % 1000) + 1;
-            height = (height % 1000) + 1;
+    // Test cupsRGBNew
+    cups_rgb_t *rgb = cupsRGBNew(num_samples, samples, cube_size, num_channels);
+    if (rgb)
+    {
+        // Create input and output buffers
+        unsigned char *input = (unsigned char *)malloc(num_pixels * 3);
+        unsigned char *output = (unsigned char *)malloc(num_pixels * num_channels);
 
-            // Create raster image object
-            int img_obj = pdfOut_add_xref(pdf);
-            pdfOut_printf(pdf, "%d 0 obj\n"
-                               "<</Type/XObject\n"
-                               "  /Subtype/Image\n"
-                               "  /Width %u\n"
-                               "  /Height %u\n"
-                               "  /ColorSpace/DeviceRGB\n"
-                               "  /BitsPerComponent 8\n"
-                               "  /Length %zu\n"
-                               ">>\n"
-                               "stream\n",
-                          img_obj, width, height, Size - 32);
-
-            // Write raster pixel data (skip header simulation)
-            size_t pixel_start = 32;
-            for (size_t i = pixel_start; i < Size && i < pixel_start + 2000; i++)
+        if (input && output)
+        {
+            // Fill input with fuzzer data
+            for (int i = 0; i < num_pixels * 3; i++)
             {
-                pdfOut_printf(pdf, "%c", Data[i]);
+                input[i] = Data[(10 + i) % Size];
             }
 
-            pdfOut_printf(pdf, "\nendstream\n"
-                               "endobj\n");
-
-            // Create content stream that uses the raster image
-            int content_obj = pdfOut_add_xref(pdf);
-            pdfOut_printf(pdf, "%d 0 obj\n"
-                               "<</Length 40\n"
-                               ">>\n"
-                               "stream\n"
-                               "q %u 0 0 %u 50 400 cm /Im1 Do Q\n"
-                               "endstream\n"
-                               "endobj\n",
-                          content_obj, width, height);
-
-            // Create page
-            int page_obj = pdfOut_add_xref(pdf);
-            pdfOut_printf(pdf, "%d 0 obj\n"
-                               "<</Type/Page\n"
-                               "  /Parent 1 0 R\n"
-                               "  /MediaBox [0 0 595 842]\n"
-                               "  /Contents %d 0 R\n"
-                               "  /Resources << /XObject << /Im1 %d 0 R >> >>\n"
-                               ">>\n"
-                               "endobj\n",
-                          page_obj, content_obj, img_obj);
-
-            pdfOut_add_page(pdf, page_obj);
+            // Test RGB separation functions
+            cupsRGBDoGray(rgb, input, output, num_pixels);
+            cupsRGBDoRGB(rgb, input, output, num_pixels);
         }
 
-        // Test different raster color modes
-        if (Size >= 16)
+        free(input);
+        free(output);
+        cupsRGBDelete(rgb);
+    }
+
+    // Test CMYK color separation
+    cups_cmyk_t *cmyk = cupsCMYKNew(num_channels);
+    if (cmyk)
+    {
+        // Test CMYK configuration functions (if available)
+        // Note: Some CMYK configuration functions might not be available in this branch
+
+        // Create input and output buffers for CMYK operations
+        unsigned char *input = (unsigned char *)malloc(num_pixels * 3);
+        short *output = (short *)malloc(num_pixels * num_channels * sizeof(short));
+
+        if (input && output)
         {
-            uint8_t color_mode = Data[8] % 4; // 0=RGB, 1=CMYK, 2=Gray, 3=Bitmap
-
-            int mode_obj = pdfOut_add_xref(pdf);
-            const char *colorspace;
-            switch (color_mode)
+            // Fill input with fuzzer data
+            for (int i = 0; i < num_pixels * 3; i++)
             {
-            case 0:
-                colorspace = "/DeviceRGB";
-                break;
-            case 1:
-                colorspace = "/DeviceCMYK";
-                break;
-            case 2:
-                colorspace = "/DeviceGray";
-                break;
-            default:
-                colorspace = "/DeviceGray";
-                break;
+                input[i] = Data[(20 + i) % Size];
             }
 
-            pdfOut_printf(pdf, "%d 0 obj\n"
-                               "<</Type/XObject\n"
-                               "  /Subtype/Image\n"
-                               "  /Width 10\n"
-                               "  /Height 10\n"
-                               "  /ColorSpace%s\n"
-                               "  /BitsPerComponent 8\n"
-                               "  /Length %zu\n"
-                               ">>\n"
-                               "stream\n",
-                          mode_obj, colorspace, Size - 16);
-
-            // Write color mode specific data
-            for (size_t i = 16; i < Size && i < 116; i++)
-            {
-                pdfOut_printf(pdf, "%c", Data[i]);
-            }
-
-            pdfOut_printf(pdf, "\nendstream\n"
-                               "endobj\n");
+            // Test CMYK separation functions
+            cupsCMYKDoBlack(cmyk, input, output, num_pixels);
+            cupsCMYKDoCMYK(cmyk, input, output, num_pixels);
+            cupsCMYKDoGray(cmyk, input, output, num_pixels);
+            cupsCMYKDoRGB(cmyk, input, output, num_pixels);
         }
 
-        pdfOut_finish_pdf(pdf);
-        pdfOut_free(pdf);
+        free(input);
+        free(output);
+        cupsCMYKDelete(cmyk);
+    }
+
+    // Test byte checking functions
+    if (Size > 50)
+    {
+        int check_width = (Data[4] % 100) + 1;
+        unsigned char *check_data = (unsigned char *)malloc(check_width);
+
+        if (check_data)
+        {
+            // Fill with fuzzer data
+            for (int i = 0; i < check_width; i++)
+            {
+                check_data[i] = Data[(50 + i) % Size];
+            }
+
+            // Test byte checking functions
+            int check_result = cupsCheckBytes(check_data, check_width);
+            (void)check_result;
+
+            unsigned char check_value = Data[5] % 256;
+            check_result = cupsCheckValue(check_data, check_width, check_value);
+            (void)check_result;
+        }
+
+        free(check_data);
+    }
+
+    // Test LUT functions with sample data
+    if (Size > 60)
+    {
+        int lut_values = (Data[6] % 10) + 2;
+        float *lut_vals = (float *)malloc(lut_values * sizeof(float));
+
+        if (lut_vals)
+        {
+            // Create LUT values from fuzzer data
+            for (int i = 0; i < lut_values; i++)
+            {
+                int offset = 60 + i * 4;
+                unsigned int val = (Data[offset % Size] << 8) | Data[(offset + 1) % Size];
+                lut_vals[i] = (float)(val % 1000) / 1000.0f;
+            }
+
+            // Sort values
+            for (int i = 0; i < lut_values - 1; i++)
+            {
+                for (int j = i + 1; j < lut_values; j++)
+                {
+                    if (lut_vals[i] > lut_vals[j])
+                    {
+                        float temp = lut_vals[i];
+                        lut_vals[i] = lut_vals[j];
+                        lut_vals[j] = temp;
+                    }
+                }
+            }
+
+            cups_lut_t *lut = cupsLutNew(lut_values, lut_vals);
+            if (lut)
+            {
+                cupsLutDelete(lut);
+            }
+        }
+
+        free(lut_vals);
     }
 
     // Cleanup
-    unlink(raster_file);
+    free(samples);
 
     return 0;
 }
@@ -165,7 +193,6 @@ void redirect_stdout_stderr()
     int dev_null = open("/dev/null", O_WRONLY);
     if (dev_null < 0)
     {
-        perror("Failed to open /dev/null");
         return;
     }
     dup2(dev_null, STDOUT_FILENO);
