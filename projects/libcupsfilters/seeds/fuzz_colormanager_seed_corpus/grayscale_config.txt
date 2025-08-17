@@ -1,0 +1,5 @@
+ColorModel=Gray
+Resolution=300dpi
+ColorSpace=Gray
+MediaType=glossy
+ColorProfile=sRGB

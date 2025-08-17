@@ -33,39 +33,41 @@
 
 #define MAX_INT 2147483647
 
-cf_logfunc_t logfunc = cfCUPSLogFunc;    // Log function
-void         *ld = NULL;                 // Log function data
+cf_logfunc_t logfunc = cfCUPSLogFunc; // Log function
+void *ld = NULL;                      // Log function data
 
 //
 // Local functions...
 //
 
 // fuzz entry point
-int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
+int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
+{
 
-  if (Size < 4) {
+  if (Size < 4)
+  {
     return 0;
   }
 
   // redirect_stdout_stderr();
 
-  int		x, y;		// Current coordinate in image
-  short		line[512];	// Line to dither
-  unsigned char	pixels[512],	// Dither pixels
-		*pixptr;	// Pointer in line
-  int		output;		// Output pixel
-  cf_lut_t	*lut;		// Dither lookup table
-  cf_dither_t	*dither;	// Dither state
-  int		nlutvals;	// Number of lookup values
-  float		lutvals[16];	// Lookup values
-  int		pixvals[16];	// Pixel values
+  int x, y;                  // Current coordinate in image
+  short line[512];           // Line to dither
+  unsigned char pixels[512], // Dither pixels
+      *pixptr;               // Pointer in line
+  int output;                // Output pixel
+  cf_lut_t *lut;             // Dither lookup table
+  cf_dither_t *dither;       // Dither state
+  int nlutvals;              // Number of lookup values
+  float lutvals[16];         // Lookup values
+  int pixvals[16];           // Pixel values
 
   // Export to Static Location
   freopen("/tmp/test", "w", stdout);
 
   // Static Input Param
   // int argc = 4;
-  // char *argv[4];  
+  // char *argv[4];
   // argv[0] = "2";
   // argv[1] = "4";
   // argv[2] = "6";
@@ -73,25 +75,30 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
 
   int argc = (Data[0] % 15) + 2;
 
-  if (Size < (size_t)(argc + 1)) {
-        return 0;
-    }
+  if (Size < (size_t)(argc + 1))
+  {
+    return 0;
+  }
 
   char **argv = (char **)malloc(argc * sizeof(char *));
-    if (!argv) {
-        free(argv);
-        return 0;
-    }
-  
-  for (int i = 0; i < argc; i++) {
-    if (Size < (i + 1) * sizeof(int)) {
-        break;
+  if (!argv)
+  {
+    return 0;
+  }
+
+  for (int i = 0; i < argc; i++)
+  {
+    if (Size < (i + 1) * sizeof(int))
+    {
+      break;
     }
 
-    int num = abs((int)Data[i % Size]); 
+    int num = abs((int)Data[i % Size]);
     argv[i] = (char *)malloc(12);
-    if (!argv[i]) {
-      for (int j = 0; j < i; j++) {
+    if (!argv[i])
+    {
+      for (int j = 0; j < i; j++)
+      {
         free(argv[j]);
       }
       free(argv);
@@ -112,24 +119,37 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
 
     nlutvals = 0;
 
-    for (x = 1; x < argc; x ++)
+    for (x = 1; x < argc; x++)
       if (isdigit(argv[x][0]) && nlutvals < 16)
       {
         pixvals[nlutvals] = atoi(argv[x]);
         lutvals[nlutvals] = atof(argv[x]) / 255.0;
-	nlutvals ++;
+        nlutvals++;
       }
       else
+      {
+        for (int j = 0; j < nlutvals; j++)
+        {
+          free(argv[j + 1]);
+        }
         free(argv);
         return 0;
+      }
 
     //
     // See if we have at least 2 values...
     //
 
     if (nlutvals < 2)
+    {
+      for (int j = 0; j < argc; j++)
+      {
+        if (argv[j])
+          free(argv[j]);
+      }
       free(argv);
       return 0;
+    }
   }
   else
   {
@@ -137,7 +157,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
     // Otherwise use the default 2-entry LUT with values of 0 and 255...
     //
 
-    nlutvals   = 2;
+    nlutvals = 2;
     lutvals[0] = 0.0;
     lutvals[1] = 1.0;
     pixvals[0] = 0;
@@ -148,7 +168,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   // Create the lookup table and dither state...
   //
 
-  lut    = cfLutNew(nlutvals, lutvals, logfunc, ld);
+  lut = cfLutNew(nlutvals, lutvals, logfunc, ld);
   dither = cfDitherNew(512);
 
   //
@@ -161,13 +181,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   // Dither 512 lines, which are written out in 256 image lines...
   //
 
-  for (y = 0; y < 512; y ++)
+  for (y = 0; y < 512; y++)
   {
     //
     // Create the grayscale data for the current line...
     //
 
-    for (x = 0; x < 512; x ++)
+    for (x = 0; x < 512; x++)
       line[x] = 4095 * ((y / 32) * 16 + x / 32) / 255;
 
     //
@@ -179,7 +199,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
     if (y == 0)
     {
       fputs("DEBUG: pixels =", stderr);
-      for (x = 0; x < 512; x ++)
+      for (x = 0; x < 512; x++)
         fprintf(stderr, " %d", pixels[x]);
       fputs("\n", stderr);
     }
@@ -188,14 +208,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
     // Add or set the output pixel values...
     //
 
-    for (x = 0, pixptr = pixels; x < 512; x ++, pixptr ++)
+    for (x = 0, pixptr = pixels; x < 512; x++, pixptr++)
     {
       output = 255 - pixvals[*pixptr];
 
       if (output < 0)
-	putchar(0);
+        putchar(0);
       else
-	putchar(output);
+        putchar(output);
     }
   }
 

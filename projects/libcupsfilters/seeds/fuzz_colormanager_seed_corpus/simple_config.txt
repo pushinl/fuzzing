@@ -1,0 +1,5 @@
+ColorModel=RGB
+Resolution=600dpi
+ColorSpace=sRGB
+MediaType=plain
+cm-calibration=on

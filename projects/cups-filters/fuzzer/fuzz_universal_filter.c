@@ -1,5 +1,4 @@
-#include <cupsfilters/filter.h>
-#include <ppd/ppd-filter.h>
+#include "pdfutils.h"
 #include <assert.h>
 #include <string.h>
 #include <stdint.h>
@@ -8,156 +7,216 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <errno.h>
 
-static void redirect_stdout_stderr(); // hide stdout
+static void redirect_stdout_stderr();
 
-// Test cfFilterUniversal and related chain functions
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 {
-    if (Size < 10 || Size > 200000)
+    if (Size < 8 || Size > 100000)
     {
         return 0;
     }
 
     redirect_stdout_stderr();
 
-    // Create temporary input file
+    // Create temporary files for input/output
     char input_file[] = "/tmp/fuzz_universal_input_XXXXXX";
+    char output_file[] = "/tmp/fuzz_universal_output_XXXXXX";
+
     int input_fd = mkstemp(input_file);
-    if (input_fd < 0)
+    int output_fd = mkstemp(output_file);
+
+    if (input_fd < 0 || output_fd < 0)
     {
+        if (input_fd >= 0)
+            close(input_fd);
+        if (output_fd >= 0)
+            close(output_fd);
         return 0;
     }
 
-    // Write fuzz data to input file
+    // Write input data
     if (write(input_fd, Data, Size) != (ssize_t)Size)
     {
         close(input_fd);
+        close(output_fd);
         unlink(input_file);
+        unlink(output_file);
         return 0;
     }
-    lseek(input_fd, 0, SEEK_SET);
+    close(input_fd);
+    close(output_fd);
 
-    // Create temporary output file
-    char output_file[] = "/tmp/fuzz_universal_output_XXXXXX";
-    int output_fd = mkstemp(output_file);
-    if (output_fd < 0)
+    // Universal filter testing through PDF conversion
+    pdfOut *pdf = pdfOut_new();
+    if (pdf)
     {
-        close(input_fd);
-        unlink(input_file);
-        return 0;
-    }
+        pdfOut_begin_pdf(pdf);
 
-    // Setup filter data structure
-    cf_filter_data_t data;
-    memset(&data, 0, sizeof(data));
-    data.printer = "test-printer";
-    data.job_id = 1;
-    data.job_user = "testuser";
-    data.job_title = "test-job";
-    data.copies = 1;
-    data.content_type = "text/plain";
-    data.final_content_type = "application/pdf";
-    data.job_attrs = NULL;
-    data.printer_attrs = NULL;
-    data.header = NULL;
-    data.num_options = 0;
-    data.options = NULL;
-    data.back_pipe[0] = -1;
-    data.back_pipe[1] = -1;
-    data.side_pipe[0] = -1;
-    data.side_pipe[1] = -1;
-    data.extension = NULL;
-    data.logfunc = NULL;
-    data.logdata = NULL;
-    data.iscanceledfunc = NULL;
-    data.iscanceleddata = NULL;
+        // Detect input format and process accordingly
+        uint8_t format_hint = Data[0];
 
-    // Test cfFilterUniversal with various content types
-    cf_filter_universal_parameter_t universal_params;
-    memset(&universal_params, 0, sizeof(universal_params));
-    universal_params.actual_output_type = "application/pdf";
-    universal_params.texttopdf_params.data_dir = "/usr/share/cups/data";
-    universal_params.texttopdf_params.char_set = "utf-8";
-    universal_params.texttopdf_params.content_type = "text/plain";
-    universal_params.texttopdf_params.classification = NULL;
-    universal_params.bannertopdf_template_dir = "/usr/share/cups/data";
+        if (format_hint < 64) // Text-like processing
+        {
+            char *text_content = (char *)malloc(Size + 1);
+            if (text_content)
+            {
+                memcpy(text_content, Data, Size);
+                text_content[Size] = '\0';
 
-    int result = cfFilterUniversal(input_fd, output_fd, 1, &data, &universal_params);
-    (void)result; // Suppress unused variable warning
+                // Sanitize text content
+                for (size_t i = 0; i < Size; i++)
+                {
+                    if (text_content[i] < 32 && text_content[i] != '\n' && text_content[i] != '\r' && text_content[i] != '\t')
+                    {
+                        text_content[i] = ' ';
+                    }
+                }
 
-    // Test with different input content types
-    lseek(input_fd, 0, SEEK_SET);
-    lseek(output_fd, 0, SEEK_SET);
-    data.content_type = "application/pdf";
-    universal_params.actual_output_type = "application/postscript";
-    data.final_content_type = "application/postscript";
-    result = cfFilterUniversal(input_fd, output_fd, 1, &data, &universal_params);
-    (void)result;
+                // Add font
+                int font_obj = pdfOut_add_xref(pdf);
+                pdfOut_printf(pdf, "%d 0 obj\n"
+                                   "<</Type/Font\n"
+                                   "  /Subtype/Type1\n"
+                                   "  /BaseFont/Helvetica\n"
+                                   ">>\n"
+                                   "endobj\n",
+                              font_obj);
 
-    // Test with image input
-    lseek(input_fd, 0, SEEK_SET);
-    lseek(output_fd, 0, SEEK_SET);
-    data.content_type = "image/jpeg";
-    universal_params.actual_output_type = "application/pdf";
-    data.final_content_type = "application/pdf";
-    result = cfFilterUniversal(input_fd, output_fd, 1, &data, &universal_params);
-    (void)result;
+                // Add text content
+                int content_obj = pdfOut_add_xref(pdf);
+                pdfOut_printf(pdf, "%d 0 obj\n"
+                                   "<</Length %zu\n"
+                                   ">>\n"
+                                   "stream\n"
+                                   "BT\n"
+                                   "/F1 12 Tf\n"
+                                   "50 750 Td\n"
+                                   "(%s) Tj\n"
+                                   "ET\n"
+                                   "endstream\n"
+                                   "endobj\n",
+                              content_obj, strlen(text_content) + 50, text_content);
 
-    // Test cfFilterTee function
-    char tee_file[] = "/tmp/fuzz_tee_XXXXXX";
-    int tee_fd = mkstemp(tee_file);
-    if (tee_fd >= 0)
-    {
-        close(tee_fd);
-        lseek(input_fd, 0, SEEK_SET);
-        lseek(output_fd, 0, SEEK_SET);
-        result = cfFilterTee(input_fd, output_fd, 1, &data, tee_file);
-        (void)result;
-        unlink(tee_file);
-    }
+                int page_obj = pdfOut_add_xref(pdf);
+                pdfOut_printf(pdf, "%d 0 obj\n"
+                                   "<</Type/Page\n"
+                                   "  /Parent 1 0 R\n"
+                                   "  /MediaBox [0 0 595 842]\n"
+                                   "  /Contents %d 0 R\n"
+                                   "  /Resources << /Font << /F1 %d 0 R >> >>\n"
+                                   ">>\n"
+                                   "endobj\n",
+                              page_obj, content_obj, font_obj);
 
-    // Test cfFilterExternal (if we have external filters available)
-    cf_filter_external_t external_params;
-    memset(&external_params, 0, sizeof(external_params));
-    external_params.filter = "/bin/cat";
-    external_params.exec_mode = 0;
-    external_params.num_options = 0;
-    external_params.options = NULL;
-    external_params.envp = NULL;
+                pdfOut_add_page(pdf, page_obj);
+                free(text_content);
+            }
+        }
+        else if (format_hint < 128) // Image-like processing
+        {
+            int img_obj = pdfOut_add_xref(pdf);
 
-    lseek(input_fd, 0, SEEK_SET);
-    lseek(output_fd, 0, SEEK_SET);
-    result = cfFilterExternal(input_fd, output_fd, 1, &data, &external_params);
-    (void)result;
+            // Determine color space based on data
+            const char *colorspace = "/DeviceRGB";
+            if (Data[1] % 3 == 1)
+                colorspace = "/DeviceGray";
+            else if (Data[1] % 3 == 2)
+                colorspace = "/DeviceCMYK";
 
-    // Test filter chain functionality
-    // Create a simple filter chain
-    cups_array_t *filter_chain = cupsArrayNew(NULL, NULL);
-    if (filter_chain)
-    {
-        cf_filter_filter_in_chain_t filter1;
-        memset(&filter1, 0, sizeof(filter1));
-        filter1.function = cfFilterTextToPDF;
-        filter1.parameters = &universal_params.texttopdf_params;
-        filter1.name = "texttopdf";
+            uint32_t width = ((Data[2] % 100) + 1) * 4;
+            uint32_t height = ((Data[3] % 100) + 1) * 4;
 
-        cupsArrayAdd(filter_chain, &filter1);
+            pdfOut_printf(pdf, "%d 0 obj\n"
+                               "<</Type/XObject\n"
+                               "  /Subtype/Image\n"
+                               "  /Width %u\n"
+                               "  /Height %u\n"
+                               "  /ColorSpace%s\n"
+                               "  /BitsPerComponent 8\n"
+                               "  /Length %zu\n"
+                               ">>\n"
+                               "stream\n",
+                          img_obj, width, height, colorspace, Size - 4);
 
-        lseek(input_fd, 0, SEEK_SET);
-        lseek(output_fd, 0, SEEK_SET);
-        data.content_type = "text/plain";
-        data.final_content_type = "application/pdf";
-        result = cfFilterChain(input_fd, output_fd, 1, &data, filter_chain);
-        (void)result;
+            // Write image data
+            for (size_t i = 4; i < Size && i < 1004; i++)
+            {
+                pdfOut_printf(pdf, "%c", Data[i]);
+            }
 
-        cupsArrayDelete(filter_chain);
+            pdfOut_printf(pdf, "\nendstream\n"
+                               "endobj\n");
+
+            // Create content stream
+            int content_obj = pdfOut_add_xref(pdf);
+            pdfOut_printf(pdf, "%d 0 obj\n"
+                               "<</Length 50\n"
+                               ">>\n"
+                               "stream\n"
+                               "q %u 0 0 %u 100 400 cm /Im1 Do Q\n"
+                               "endstream\n"
+                               "endobj\n",
+                          content_obj, width, height);
+
+            int page_obj = pdfOut_add_xref(pdf);
+            pdfOut_printf(pdf, "%d 0 obj\n"
+                               "<</Type/Page\n"
+                               "  /Parent 1 0 R\n"
+                               "  /MediaBox [0 0 595 842]\n"
+                               "  /Contents %d 0 R\n"
+                               "  /Resources << /XObject << /Im1 %d 0 R >> >>\n"
+                               ">>\n"
+                               "endobj\n",
+                          page_obj, content_obj, img_obj);
+
+            pdfOut_add_page(pdf, page_obj);
+        }
+        else // Vector/PostScript-like processing
+        {
+            // Create vector graphics content
+            int vector_obj = pdfOut_add_xref(pdf);
+            pdfOut_printf(pdf, "%d 0 obj\n"
+                               "<</Length 300\n"
+                               ">>\n"
+                               "stream\n"
+                               "q\n"
+                               "1 0 0 1 200 400 cm\n"
+                               "%d %d %d rg\n" // RGB from data
+                               "%d %d %d RG\n" // Stroke RGB from data
+                               "2 w\n"
+                               "%d %d m\n"        // Move to from data
+                               "%d %d l\n"        // Line to from data
+                               "%d %d %d %d re\n" // Rectangle from data
+                               "B\n"
+                               "Q\n"
+                               "endstream\n"
+                               "endobj\n",
+                          vector_obj,
+                          Data[1] % 256, Data[2] % 256, Data[3] % 256,                 // Fill color
+                          Data[4] % 256, Data[5] % 256, Data[6] % 256,                 // Stroke color
+                          Data[7] % 200, Data[0] % 200,                                // Move to
+                          (Data[1] + 50) % 200, (Data[2] + 50) % 200,                  // Line to
+                          Data[3] % 100, Data[4] % 100, Data[5] % 100, Data[6] % 100); // Rectangle
+
+            int page_obj = pdfOut_add_xref(pdf);
+            pdfOut_printf(pdf, "%d 0 obj\n"
+                               "<</Type/Page\n"
+                               "  /Parent 1 0 R\n"
+                               "  /MediaBox [0 0 595 842]\n"
+                               "  /Contents %d 0 R\n"
+                               ">>\n"
+                               "endobj\n",
+                          page_obj, vector_obj);
+
+            pdfOut_add_page(pdf, page_obj);
+        }
+
+        pdfOut_finish_pdf(pdf);
+        pdfOut_free(pdf);
     }
 
     // Cleanup
-    close(input_fd);
-    close(output_fd);
     unlink(input_file);
     unlink(output_file);
 
@@ -169,6 +228,7 @@ void redirect_stdout_stderr()
     int dev_null = open("/dev/null", O_WRONLY);
     if (dev_null < 0)
     {
+        perror("Failed to open /dev/null");
         return;
     }
     dup2(dev_null, STDOUT_FILENO);

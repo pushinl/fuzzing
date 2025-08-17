@@ -1,0 +1,5 @@
+Unicode test: 中文测试 français español русский العربية 日本語
+Special characters: @#$%^&*()_+-=[]{}|;':\",./<>?
+Newlines and tabs:
+	Tab character
+Line break

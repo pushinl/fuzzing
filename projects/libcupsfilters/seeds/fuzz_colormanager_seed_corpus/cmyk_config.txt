@@ -1,0 +1,6 @@
+ColorModel=CMYK
+Resolution=1200dpi
+ColorSpace=CMYK
+MediaType=photo
+cm-calibration=off
+Calibrate=1

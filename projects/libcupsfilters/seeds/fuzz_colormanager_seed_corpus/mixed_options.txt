@@ -1,0 +1,5 @@
+Unknown=value
+ColorModel=RGB=invalid
+Resolution=abc
+MediaType=
+cm-calibration=""

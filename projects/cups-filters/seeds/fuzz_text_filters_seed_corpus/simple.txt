@@ -1,0 +1,4 @@
+Hello World!
+This is a simple text file for testing.
+Multiple lines with various characters: !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+Numbers: 0123456789

@@ -1,0 +1,7 @@
+Hello, this is test data for filter chain processing.
+Line 1
+Line 2
+Line 3
+
+Special characters: åäöñç €£¥
+Unicode test: 你好世界 🌍

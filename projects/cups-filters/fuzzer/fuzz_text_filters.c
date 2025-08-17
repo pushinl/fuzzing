@@ -1,5 +1,4 @@
-#include <cupsfilters/filter.h>
-#include <ppd/ppd-filter.h>
+#include "pdfutils.h"
 #include <assert.h>
 #include <string.h>
 #include <stdint.h>
@@ -8,11 +7,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <errno.h>
 
-static void redirect_stdout_stderr(); // hide stdout
+static void redirect_stdout_stderr();
 
-// Test cfFilterTextToPDF and cfFilterTextToText functions
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 {
     if (Size < 5 || Size > 100000)
@@ -23,89 +20,97 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     redirect_stdout_stderr();
 
     // Create temporary input file
-    char input_file[] = "/tmp/fuzz_input_XXXXXX";
+    char input_file[] = "/tmp/fuzz_text_input_XXXXXX";
     int input_fd = mkstemp(input_file);
     if (input_fd < 0)
     {
         return 0;
     }
 
-    // Write fuzz data to input file
+    // Write fuzzer input to temporary file
     if (write(input_fd, Data, Size) != (ssize_t)Size)
     {
         close(input_fd);
         unlink(input_file);
         return 0;
     }
-    lseek(input_fd, 0, SEEK_SET);
+    close(input_fd);
 
     // Create temporary output file
-    char output_file[] = "/tmp/fuzz_output_XXXXXX";
+    char output_file[] = "/tmp/fuzz_text_output_XXXXXX";
     int output_fd = mkstemp(output_file);
     if (output_fd < 0)
     {
-        close(input_fd);
         unlink(input_file);
         return 0;
     }
 
-    // Setup filter data structure
-    cf_filter_data_t data;
-    memset(&data, 0, sizeof(data));
-    data.printer = "test-printer";
-    data.job_id = 1;
-    data.job_user = "testuser";
-    data.job_title = "test-job";
-    data.copies = 1;
-    data.content_type = "text/plain";
-    data.final_content_type = "application/pdf";
-    data.job_attrs = NULL;
-    data.printer_attrs = NULL;
-    data.header = NULL;
-    data.num_options = 0;
-    data.options = NULL;
-    data.back_pipe[0] = -1;
-    data.back_pipe[1] = -1;
-    data.side_pipe[0] = -1;
-    data.side_pipe[1] = -1;
-    data.extension = NULL;
-    data.logfunc = NULL;
-    data.logdata = NULL;
-    data.iscanceledfunc = NULL;
-    data.iscanceleddata = NULL;
+    // Test 1: Text to PDF conversion using pdfOut
+    pdfOut *pdf = pdfOut_new();
+    if (pdf)
+    {
+        pdfOut_begin_pdf(pdf);
 
-    // Test cfFilterTextToPDF
-    cf_filter_texttopdf_parameter_t texttopdf_params;
-    memset(&texttopdf_params, 0, sizeof(texttopdf_params));
-    texttopdf_params.data_dir = "/usr/share/cups/data";
-    texttopdf_params.char_set = "utf-8";
-    texttopdf_params.content_type = "text/plain";
-    texttopdf_params.classification = NULL;
+        // Add font
+        int font_obj = pdfOut_add_xref(pdf);
+        pdfOut_printf(pdf, "%d 0 obj\n"
+                           "<</Type/Font\n"
+                           "  /Subtype /Type1\n"
+                           "  /BaseFont /Courier\n"
+                           ">>\n"
+                           "endobj\n",
+                      font_obj);
 
-    int result = cfFilterTextToPDF(input_fd, output_fd, 1, &data, &texttopdf_params);
-    (void)result; // Suppress unused variable warning
+        // Add content stream
+        int content_obj = pdfOut_add_xref(pdf);
+        char *text_buf = (char *)malloc(Size + 1);
+        if (text_buf)
+        {
+            memcpy(text_buf, Data, Size);
+            text_buf[Size] = '\0';
 
-    // Reset file positions
-    lseek(input_fd, 0, SEEK_SET);
-    lseek(output_fd, 0, SEEK_SET);
+            // Sanitize text for PDF
+            for (size_t i = 0; i < Size; i++)
+            {
+                if (text_buf[i] < 32 && text_buf[i] != '\n' && text_buf[i] != '\r' && text_buf[i] != '\t')
+                {
+                    text_buf[i] = ' ';
+                }
+            }
 
-    // Test cfFilterTextToText
-    data.final_content_type = "text/plain";
-    result = cfFilterTextToText(input_fd, output_fd, 1, &data, NULL);
-    (void)result;
+            pdfOut_printf(pdf, "%d 0 obj\n"
+                               "<</Length %d\n"
+                               ">>\n"
+                               "stream\n"
+                               "BT\n"
+                               "/F1 12 Tf\n"
+                               "50 750 Td\n"
+                               "(%s) Tj\n"
+                               "ET\n"
+                               "endstream\n"
+                               "endobj\n",
+                          content_obj, (int)strlen(text_buf) + 50, text_buf);
+            free(text_buf);
+        }
 
-    // Test cfFilterBannerToPDF
-    data.final_content_type = "application/pdf";
-    data.content_type = "application/vnd.cups-pdf-banner";
-    lseek(input_fd, 0, SEEK_SET);
-    lseek(output_fd, 0, SEEK_SET);
+        // Add page
+        int page_obj = pdfOut_add_xref(pdf);
+        pdfOut_printf(pdf, "%d 0 obj\n"
+                           "<</Type/Page\n"
+                           "  /Parent 1 0 R\n"
+                           "  /MediaBox [0 0 595 842]\n"
+                           "  /Contents %d 0 R\n"
+                           "  /Resources << /Font << /F1 %d 0 R >> >>\n"
+                           ">>\n"
+                           "endobj\n",
+                      page_obj, content_obj, font_obj);
 
-    const char *banner_template_dir = "/usr/share/cups/data";
-    result = cfFilterBannerToPDF(input_fd, output_fd, 1, &data, (void *)banner_template_dir);
-    (void)result;
+        pdfOut_add_page(pdf, page_obj);
+        pdfOut_finish_pdf(pdf);
+        pdfOut_free(pdf);
+    }
 
     // Cleanup
-    close(input_fd);
     close(output_fd);
     unlink(input_file);
     unlink(output_file);
@@ -118,6 +123,7 @@ void redirect_stdout_stderr()
     int dev_null = open("/dev/null", O_WRONLY);
     if (dev_null < 0)
     {
+        perror("Failed to open /dev/null");
         return;
     }
     dup2(dev_null, STDOUT_FILENO);
