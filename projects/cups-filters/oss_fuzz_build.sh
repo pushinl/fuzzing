@@ -60,7 +60,7 @@ patch < patch_qpdf_xobject
 popd
 
 ./autogen.sh
-./configure --enable-static --disable-shared
+./configure --enable-static --disable-shared --enable-libcupsimage
 make # -j$(nproc)
 popd
 
