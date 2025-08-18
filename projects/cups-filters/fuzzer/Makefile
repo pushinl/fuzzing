@@ -15,7 +15,7 @@ INCDIR=-I./../filter -I./../fontembed -I./../ -I./../cupsfilters
 LIBDIR=-L./../filter -L./../fontembed -L./../ -L./../.libs -L./../cupsfilters/.libs
 
 BUILD_FLAGS=-g -O0 
-LINK_FLAGS=-g -O0 -l:libcupsfilters.a -l:libcups.a -l:libfontconfig.a -l:libfreetype.a -lz -l:libtiff.a \
+LINK_FLAGS=-g -O0 -l:libcupsfilters.a -l:libcups.a -l:libfontconfig.a -l:libfreetype.a -lz -l:libfontembed.a -l:libtiff.a \
 	-l:libjpeg.a -l:liblzma.a -l:libjbig.a -l:libpng.a -l:libexif.a -l:libunistring.a -l:libavahi-client.a -l:libavahi-common.a -l:libdbus-1.a -l:libcap.a -l:libglib-2.0.a -l:libexpat.a \
 	-l:libqpdf.a -l:libgssapi_krb5.so.2 -l:liblcms2.so -lsystemd -lpthread \
 	-Wl,--allow-multiple-definition
