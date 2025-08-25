@@ -1,5 +1,4 @@
 #include "pdfutils.h"
-#include <cupsfilters/driver.h>
 #include <cups/cups.h>
 #include <cups/ppd.h>
 #include <assert.h>

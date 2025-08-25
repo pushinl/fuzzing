@@ -1,6 +1,0 @@
-PageSize=A4
-Resolution=600dpi
-ColorModel=RGB
-Quality=Normal
-Duplex=None
-Copies=1

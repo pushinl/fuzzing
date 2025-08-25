@@ -1,7 +1,0 @@
-PageSize=A4"
-Resolution=600dpi
-ColorModel=RGB=
-Quality
-Duplex=None=True
-Copies=abc
-"InvalidOption=Value

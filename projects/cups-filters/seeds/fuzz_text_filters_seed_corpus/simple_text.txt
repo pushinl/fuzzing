@@ -1,8 +1,0 @@
-Hello, World!
-This is a simple text file for testing text-to-PDF conversion.
-Line 1
-Line 2
-Line 3
-
-Special characters: åäöñç
-Unicode: 你好世界 🌍
